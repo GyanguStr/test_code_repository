@@ -3,6 +3,8 @@ import os
 import time
 import json
 import pandas as pd
+from typing import Tuple
+from components.custom_loaders import CustomGitLoader
 from concurrent.futures import ThreadPoolExecutor
 from components.postgre_wrapper import PgService
 from modules.model import get_llm
@@ -15,7 +17,7 @@ from dataclasses import dataclass, field
 from components.key_vault import FetchKey
 from components.chat_prompt import ChatPrompt
 from modules.model import get_embedding
-from langchain.document_loaders import GitLoader
+from modules.mass_milvus import MassMilvus
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains.summarize import load_summarize_chain
@@ -144,7 +146,7 @@ class GithubService:
             "release_date": releases[0].published_at.strftime("%Y-%m-%d") if releases else datetime.now().strftime(
                 "%Y-%m-%d"),
             "release_body": releases[0].body if releases else "",
-            "pulls_contents": json_pulls,
+            "release_change_contents": json_pulls,
             "issues_contents": json_issues
         }
         df = pd.DataFrame(data=[contents_dict])
@@ -177,6 +179,7 @@ class GitRepoLoader:
 
     git_url: str
     git_branch: str = "master"
+    file_filter: Tuple[str, ...] = None
     local_path: str = field(init=False)
 
     def __post_init__(self):
@@ -184,23 +187,32 @@ class GitRepoLoader:
         self.local_path = f"./{split_git_url[3]}/{split_git_url[4]}"
 
     def git_load_remote(self):
-        loader = GitLoader(
+        loader = CustomGitLoader(
             clone_url=self.git_url,
             repo_path=self.local_path,
             branch=self.git_branch,
         )
 
-        data_doc = loader.load()
+        # data_doc = loader.load() #for loop function
+        data_doc = asyncio.run(loader.a_load())
+        data_doc = [doc for doc in data_doc if doc.page_content]
         return data_doc
 
     def git_load_local(self):
-        loader = GitLoader(
-            repo_path=self.local_path,
-            branch=self.git_branch,
-            file_filter=lambda file_path: file_path.endswith((".py", ".txt", ".md", ".ipynb"))
-        )
-
-        data_doc = loader.load()
+        if self.file_filter:
+            loader = CustomGitLoader(
+                repo_path=self.local_path,
+                branch=self.git_branch,
+                file_filter=lambda file_path: file_path.endswith(self.file_filter)
+            )
+        else:
+            loader = CustomGitLoader(
+                repo_path=self.local_path,
+                branch=self.git_branch,
+            )
+        # data_doc = loader.load() #for loop function
+        data_doc = asyncio.run(loader.a_load())
+        data_doc = [doc for doc in data_doc if doc.page_content]
         return data_doc
 
     def get_releases_version(self):
@@ -324,19 +336,34 @@ class AsyncService:
                                        collection_name=self.collection_name,
                                        connection_args=self.connection_args)
 
+    @staticmethod
+    async def a_similarity_search(collection_instance: Milvus, query: str, k: int = 4):
+        return await asyncio.to_thread(
+            collection_instance.similarity_search_with_score,
+            query=query,
+            k=k)
+
 
 if __name__ == "__main__":
-    # 16236
-    executor = ThreadPoolExecutor(max_workers=100)
-    asyncio.get_event_loop().set_default_executor(executor)
+    # executor = ThreadPoolExecutor(max_workers=100)
+    # asyncio.get_event_loop().set_default_executor(executor)
     os.environ["OPENAI_API_KEY"] = FetchKey("OPENAI-KEY").retrieve_secret()
     MILVUS_HOST = '52.226.226.29'
+    milvus_connection_args = {'host': MILVUS_HOST}
     git_url = "https://github.com/theskumar/python-dotenv"
-    gsv = GitStoreVector(git_url=git_url, database_host=MILVUS_HOST, git_branch="main")
-    # gsv.store_milvus()
-    rst = asyncio.run(gsv.astore_milvus(remote=False))
-    print(rst)
-    # grl = GitRepoLoader(git_url=git_url, git_branch="main")
-    # rsts = grl.git_load_local()
-    # for rst in rsts:
-    #     print(rst.metadata)
+    grl = GitRepoLoader(git_url="https://github.com/hwchase17/langchain",
+                        git_branch="master",
+                        file_filter=(".py",))
+    data = grl.git_load_local()
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=100,
+    )
+
+    docs = text_splitter.split_documents(data)
+    print('Total number of documents:', len(docs))
+    ts = time.time()
+    a = MassMilvus.afrom_documents(docs, collection_name='dev_git_hwchase17_langchain_codes',
+                                   connection_args=milvus_connection_args,
+                                   drop_old=True)
+    print('Total time usage:', f'{time.time() - ts:.2f}')
