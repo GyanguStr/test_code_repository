@@ -154,6 +154,17 @@ class GithubService:
         return [contents_dict]
 
     @staticmethod
+    def store_release_notes(repo_name: str, release_version: str, release_note: json, table_name: str,):
+        pg_service = PgService(table_name=table_name)
+        release_dict = {
+            "repo_name": repo_name,
+            "release_version": release_version,
+            "release_note": release_note
+        }
+        df = pd.DataFrame(data=[release_dict])
+        pg_service.handle_table(data_df=df)
+
+    @staticmethod
     def summary_pull_content(contents: str) -> str:
         llm = get_llm(model="GPT-4", temperature=0.2)
         pull_changes = contents

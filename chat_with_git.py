@@ -35,7 +35,8 @@ def clear_submit():
 def initialize_session_state():
     ss.pop('chat_with_git_buffer', None)
     ss.pop('chat_with_git_cost', None)
-    ss.pop('release_notes', None)
+    ss.pop('release_contents', None)
+    ss.pop('has_release_notes', None)
     ss.pop('git_sources', None)
 
 
@@ -82,7 +83,7 @@ class RenderPage:
     def get_chat_record():
         messages = ss.get('chat_with_git_buffer', ConversationBufferMemory()).chat_memory.messages.copy()
         messages.reverse()
-        if ss.get("release_notes"):
+        if ss.get("release_contents"):
             RenderPage.process_text_contents()
         for i, msg in enumerate(messages):
             if i % 2 == 0:
@@ -105,7 +106,7 @@ class RenderPage:
     @staticmethod
     def process_text_contents():
         st.title("Release Notes")
-        release_notes = ss.get("release_notes")
+        release_notes = ss.get("release_contents")
         release_notes = json.loads(release_notes)
         if release_notes.get("Release version"):
             st.markdown(f"##### release version---{release_notes['Release version']}")
@@ -207,14 +208,24 @@ class ChatService:
         else:
             end_time = ""
         if releases and table_name:
+            ss["release_version"] = releases[0].tag_name
             pg_service = PgService(table_name=table_name)
             check_sql = f"""
                        SELECT repo_name, release_version, release_date, release_body, release_change_contents, issues_contents
-                        FROM repo_release_contents WHERE release_version = '{releases[0].tag_name}' 
+                        FROM repo_release_contents WHERE release_version = '{releases[0].tag_name}'
                        and repo_name = '{repo_name}';
                    """
             has_data = pg_service.execute_sql(command=check_sql)
             if has_data:
+                check_sql = f"""
+                               SELECT release_note
+                               FROM repo_release_notes WHERE release_version = '{releases[0].tag_name}'
+                               and repo_name = '{repo_name}';
+                               """
+                has_notes = pg_service.execute_sql(command=check_sql)
+                if has_notes:
+                    ss["has_release_notes"] = True
+                    return has_notes[0][0]
                 columns = ["repo_name", "release_version", "release_date", "release_body", "release_change_contents",
                            "issues_contents"]
                 df = pd.DataFrame(data=has_data, columns=columns)
@@ -233,7 +244,8 @@ class ChatService:
 
     @staticmethod
     def chat_with_git(query: str):
-        ss.pop('release_notes', None)
+        ss.pop('release_contents', None)
+        ss.pop('has_release_notes', None)
         temperature = ss.get("OPENAI_TEMPERATURE") if ss.get("OPENAI_TEMPERATURE") else 0.0
         engine = st.session_state.get("OPENAI_MODEL")
         chat_history = ss.get('chat_with_git_buffer') if ss.get(
@@ -252,7 +264,7 @@ class ChatService:
             Tool(
                 name="Common chat about the repository",
                 func=agent.repo_chat,
-                description="useful for when you need to answer questions except release notes/release and version of the repository",
+                description="useful for when you need to answer questions except release notes/release and version",
                 return_direct=True
             ),
             Tool(
@@ -298,14 +310,21 @@ class ChatService:
             else:
                 repo_link = f"https://gitlab.com/{repo_name}/-/blob/main/"
         else:
-            repo_link = f"https://github.com/{collection_list[2]}/{collection_list[3]}/tree/master/"
+            repo_name = f"{collection_list[2]}/{collection_list[3]}"
+            repo_link = f"https://github.com/{repo_name}/tree/master/"
         sources = [{
             'score': round(d[1], 5),
             'content': d[0].page_content,
             'file_path': f"{repo_link}{d[0].metadata['source']}",
             'file_name': d[0].metadata["file_name"],
         } for doc in docs for d in doc]
-
+        if not ss.get("has_release_notes") and ss.get("release_contents"):
+            GithubService.store_release_notes(
+                repo_name=repo_name,
+                release_version=ss.get("release_version"),
+                table_name="repo_release_notes",
+                release_note=ss.get("release_contents")
+            )
         ss['git_sources'] = [sources] + [[]] + ss.get('git_sources', [])
         ss['chat_with_git_cost'] = [get_cost_dict(cb)] + [{}] + ss.get('chat_with_git_cost', [])
         return cb
@@ -322,13 +341,14 @@ class GithubAgent:
         self.llm = get_llm(model=self.engine, temperature=self.temperature)
 
     def repo_release_notes(self, query: str):
-        contents = ChatService.get_release_notes()
-        release_prompt = PromptTemplate(template=ChatPrompt.release_prompt,
-                                        input_variables=["text", "question"])
-        release_chain = LLMChain(llm=self.llm,
-                                 prompt=release_prompt)
-        response = release_chain.run({"question": query, "text": contents[0]})
-        ss["release_notes"] = response
+        response = ChatService.get_release_notes()
+        if not ss.get("has_release_notes"):
+            release_prompt = PromptTemplate(template=ChatPrompt.release_prompt,
+                                            input_variables=["text", "question"])
+            release_chain = LLMChain(llm=self.llm,
+                                     prompt=release_prompt)
+            response = release_chain.run({"question": query, "text": response[0]})
+        ss["release_contents"] = response
         return response
 
     def repo_release_chat(self, query: str):
