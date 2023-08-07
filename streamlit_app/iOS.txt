@@ -1,0 +1,50 @@
+{
+    "Overview": "The iOS & iPadOS 16.4 SDK provides support to develop apps for iPhone and iPad running iOS & iPadOS 16.5. The SDK comes bundled with Xcode 14.3, available from the Mac App Store. For information on the compatibility requirements for Xcode 14.3, see Xcode 14.3 Release Notes.",
+    "Release version": "v16.6",
+    "Repository name": "iOS",
+    "What's Changed": [
+        "Fixed: When a manual software update is attempted on a Matter accessory with an available update, Home might not indicate that the update has been requested and continue to indicate an update is available.",
+        "Fixed: Accessory paring by shared administrators will fail if Home hubs are running versions prior than tvOS 16.5 beta.",
+        "Fixed: Software updates for Matter accessories might be offered again even though the update already completed successfully.",
+        "Fixed: Shared administrators aren¡¯t able to pair the first Matter accessory in a Home",
+    ],
+    "New Features": [
+        "A shared administrator in a home is now able to pair and add Matter accessories.",
+		"New Emoji library: iOS v16.6 introduces a variety of new emojis, including more inclusive options and additional animals, food, and objects.",
+		"Improved Siri voice assistance: Siri now offers more natural-sounding voices and enhanced language understanding for better communication with users.",
+		"Enhanced privacy features: The new App Tracking Transparency feature allows users to control which apps can track their activity across other apps and websites.",
+		"Revamped Apple Maps: iOS v16.6 brings a redesigned Apple Maps interface with more detailed information, including cycling routes, EV charging stations, and indoor maps for select locations.",
+		"Improved battery health management: The updated Battery Health feature provides more accurate battery life predictions and optimized charging patterns to extend the lifespan of your device's battery."
+    ],
+    "Known Issues": [
+        "Pairing the first Matter accessory in a new Home will fail when paired by selecting the accessory from the nearby accessories list.",
+        "Workaround: Pair the first Matter accessory by scanning the QR code on the Add Accessory card. Subsequent Matter accessories can be paired using the nearby accessories list",
+		"Starting in iOS 16.6 a negative value for NSBaselineOffsetAttributeName applied to the full run of an attributedText of a UILabel will return to its pre-16.3 behavior of lowering the text position within the label¡¯s bounds"
+    ]
+}
+
+
+{
+    "Overview": "The iOS & iPadOS 17 SDK provides support to develop apps for iPhone and iPad running iOS & iPadOS 17 beta 3. The SDK comes bundled with Xcode 15 beta 3, available from the Beta Software Downloads. For information on the compatibility requirements for Xcode 15 beta 3, see Xcode 15 Beta 3 Release Notes.",
+    "Release version": "v17.0",
+    "Repository name": "iOS",
+    "What's Changed": [
+        "Improved app stability: iOS 17.0 addresses various app crashing issues, providing a smoother and more reliable user experience across all applications.",
+        "Fixed Bluetooth pairing issues: iOS 17.0 resolves issues with Bluetooth pairing, allowing for seamless connections with headphones, speakers, and other Bluetooth-enabled devices.",
+        "Improved GPS accuracy: The update enhances GPS accuracy and location tracking, providing more precise navigation and location-based services.",
+        "Resolved notification glitches: iOS 17.0 fixes issues with delayed or missing notifications, ensuring that users receive timely alerts for messages, emails, and app updates.",
+		"Fixed storage management issues: The update addresses problems with incorrect storage usage reporting, making it easier for users to manage their device's storage space effectively."
+    ],
+    "New Features": [
+        "Advanced Face ID recognition: Building on the improvements in iOS v16.6, iOS v17.0 offers even faster and more secure facial recognition, with added support for masks and other facial coverings.",
+		"Customizable Dark Mode: In addition to scheduling, users can now customize the appearance of Dark Mode, adjusting the color scheme and contrast to their personal preferences.",
+		"Expanded Emoji library: iOS v17.0 introduces even more emojis, with a focus on diverse representation and new animated options for a more expressive messaging experience.",
+		"Siri voice assistance upgrades: Siri now supports more languages and dialects, and offers a more conversational interaction style, making it easier to communicate and receive assistance.",
+		"Apple Maps 3D view: The revamped Apple Maps now includes a 3D view option, allowing users to explore cities and landmarks in a more immersive and realistic way.",
+    ],
+    "Known Issues": [
+        "Devices with a large number of installed apps will display an Apple logo with progress bar for an extended period while the file system format is updated. This is a one-time migration when upgrading to iOS 17 beta for the first time.",
+        "MP3 files with malformed ID3 tags will fail to play.",
+		"With any Classroom class set up, the AirDrop browser on teacher and student devices will not show any device"
+    ]
+}
